@@ -1,0 +1,85 @@
+#!/bin/bash
+
+show_help() {
+    echo "用法: $0 [--swim|-s <swimlane>] [--time|-t <timeout>] <curl_file>"
+    echo ""
+    echo "参数说明："
+    echo "  --swim, -s    替换curl命令中的 '1960-stavs' 字符串"
+    echo "  --time, -t    curl命令最大超时时间（秒）"
+    echo "  curl_file     curl命令文件路径（必须放在最后）"
+    echo ""
+    echo "示例："
+    echo "  $0 --swim 2024-test --time 10 ../curl/issue_with_backup.txt"
+    echo "  $0 -s 2024-test -t 10 ../curl/issue_with_backup.txt"
+    echo ""
+    echo "如果只传入curl_file，则直接执行原始curl命令。"
+    echo ""
+    echo "显示帮助："
+    echo "  $0 -h"
+}
+
+# 默认参数
+REPLACE_STR=""
+TIMEOUT=""
+CURL_FILE=""
+
+# 参数解析
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        --swim|-s)
+            REPLACE_STR="$2"
+            shift 2
+            ;;
+        --time|-t)
+            TIMEOUT="$2"
+            shift 2
+            ;;
+        *)
+            CURL_FILE="$1"
+            shift
+            ;;
+    esac
+done
+
+if [ -z "$CURL_FILE" ]; then
+    echo "错误：缺少curl命令文件路径参数！"
+    show_help
+    exit 1
+fi
+
+if [ ! -f "$CURL_FILE" ]; then
+    echo "错误：curl命令文件 $CURL_FILE 不存在！"
+    exit 2
+fi
+
+ORIGINAL_CURL=$(cat "$CURL_FILE")
+NEW_CURL="$ORIGINAL_CURL"
+
+# 只在有参数时才做对应操作
+if [ -n "$REPLACE_STR" ]; then
+    NEW_CURL=$(echo "$NEW_CURL" | sed "s/1960-stavs/$REPLACE_STR/g")
+fi
+
+if [ -n "$TIMEOUT" ]; then
+    if echo "$NEW_CURL" | grep -qE -- '--max-time[ ]+[0-9]+|-m[ ]*[0-9]+'; then
+        # 替换已有超时时间
+        NEW_CURL=$(echo "$NEW_CURL" | sed -E "s/--max-time[ ]*[0-9]+/--max-time $TIMEOUT/g" | sed -E "s/-m[ ]*[0-9]+/-m $TIMEOUT/g")
+    else
+        # 没有超时参数则追加
+        NEW_CURL="$NEW_CURL --max-time $TIMEOUT"
+    fi
+fi
+
+echo "执行命令中. . ."
+echo "--------------------"
+echo "返回结果："
+START_TIME=$(date +%s.%N)
+eval "$NEW_CURL"
+END_TIME=$(date +%s.%N)
+ELAPSED=$(python3 -c "print('%.3f' % (${END_TIME} - ${START_TIME}))")
+echo ""
+echo "耗时: ${ELAPSED} 秒"
