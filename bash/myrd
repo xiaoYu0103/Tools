@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# 获取当前 bash 脚本所在目录
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PY_SCRIPT="$SCRIPT_DIR/../python/record_key_words.py"
+
+# 传递所有参数给 python 脚本
+python3 "$PY_SCRIPT" "$@"
